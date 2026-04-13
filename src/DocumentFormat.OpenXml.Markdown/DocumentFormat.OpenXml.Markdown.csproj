@@ -11,7 +11,12 @@
         <PackageTags>Open XML SDK;Markdown;GitHub Flavored Markdown;GFM;Document Conversion</PackageTags>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageId>DocumentFormat.OpenXml.Markdown</PackageId>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="DocumentFormat.OpenXml" />

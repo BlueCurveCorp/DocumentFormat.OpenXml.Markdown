@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/DocumentFormat.OpenXml.Markdown.Tests/DocumentFormat.OpenXml.Markdown.Tests.csproj" />
+  <Project Path="src/DocumentFormat.OpenXml.Markdown/DocumentFormat.OpenXml.Markdown.csproj" />
+</Solution>

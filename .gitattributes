@@ -1,0 +1,16 @@
+###############################################################################
+# Set default behavior to automatically normalize line endings.
+###############################################################################
+* text eol=lf working-tree-encoding=UTF-8 encoding=utf-8
+*.sh eol=lf working-tree-encoding=UTF-8 encoding=utf-8
+*.yml text working-tree-encoding=UTF-8 encoding=utf-8
+*.yaml text working-tree-encoding=UTF-8 encoding=utf-8
+*.json text working-tree-encoding=UTF-8 encoding=utf-8
+*.cs text working-tree-encoding=UTF-8 encoding=utf-8
+*.md text working-tree-encoding=UTF-8 encoding=utf-8
+*.csproj text working-tree-encoding=UTF-8 encoding=utf-8
+
+*.docx filter=lfs diff=lfs merge=lfs -text
+*.xlsx filter=lfs diff=lfs merge=lfs -text
+*.xlsm filter=lfs diff=lfs merge=lfs -text
+*.pptx filter=lfs diff=lfs merge=lfs -text

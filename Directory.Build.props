@@ -1,0 +1,70 @@
+<Project>
+    <PropertyGroup>
+        <LangVersion>preview</LangVersion>
+        <Nullable>enable</Nullable>
+        <TargetFramework>net10.0</TargetFramework>
+        <Deterministic>true</Deterministic>
+        <DebugType>portable</DebugType>
+        <PackageProjectUrl>https://github.com/BlueCurveCorp/DocumentFormat.OpenXml.Markdown</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/BlueCurveCorp/DocumentFormat.OpenXml.Markdown.git</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+        <Company>BlueCurve Corp</Company>
+        <Authors>BlueCurve Corp</Authors>
+        <Owners>BlueCurve Corp</Owners>
+        <Copyright>(c) BlueCurve Corp $([System.DateTime]::UtcNow.Year.ToString())</Copyright>
+        <Product>BlueCurve Search</Product>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <PublishReadyToRun>true</PublishReadyToRun>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>      
+        <NoWarn>CS1591</NoWarn>
+        <!--NU1903-->
+        <NeutralLanguage>en-US</NeutralLanguage>
+        <ErrorReport>send</ErrorReport>
+        <PackageOutputDir>distribution/$(ConfigurationName)/sdk</PackageOutputDir>
+        <RequireLicenseAcceptance>true</RequireLicenseAcceptance>
+        <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <AnalysisLevel>latest</AnalysisLevel>
+        <AnalysisMode>All</AnalysisMode>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+        <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+        <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    </PropertyGroup>
+    <!-- Define SolutionDir if not already defined, mandatory to build the SDK nugets properly-->
+    <PropertyGroup Condition="'$(SolutionDir)' == ''">
+        <SolutionDir>$(MSBuildThisFileDirectory)</SolutionDir>
+    </PropertyGroup>    
+    <Target Name="PrintRID" BeforeTargets="Build">
+        <Message Text="Current RuntimeIdentifier: '$(RuntimeIdentifier)'" Importance="high" />
+    </Target>
+    <Choose>
+        <When Condition="'$(Configuration)'=='Debug'">
+            <PropertyGroup>
+                <PublishRepositoryUrl>true</PublishRepositoryUrl>
+            </PropertyGroup>
+        </When>
+        <Otherwise>
+            <PropertyGroup>
+                <PublishRepositoryUrl>false</PublishRepositoryUrl>
+            </PropertyGroup>
+        </Otherwise>
+    </Choose>
+    <ItemGroup>
+        <Folder Remove="Logs\" />
+    </ItemGroup>
+    <ItemGroup>
+		<PackageReference Include="DotNet.ReproducibleBuilds">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.SourceLink.AzureRepos.Git">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="IsNullEnforcer" />
+    </ItemGroup>
+</Project>

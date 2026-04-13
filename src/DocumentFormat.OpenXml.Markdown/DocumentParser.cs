@@ -12,6 +12,8 @@ namespace DocumentFormat.OpenXml.Markdown;
 /// </summary>
 internal static class DocumentParser
 {
+    private const string MathNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/math";
+
     public static string Parse(WordprocessingDocument document, MarkdownConverterSettings settings)
     {
         var sb = new StringBuilder();
@@ -39,6 +41,17 @@ internal static class DocumentParser
             else if (element is Table table)
             {
                 ParseTable(table, mainPart, settings, sb);
+            }
+            else if (element.NamespaceUri == MathNamespace)
+            {
+                if (element.LocalName == "oMathPara")
+                {
+                    sb.Append(MathParser.ParseOfficeMathPara(element));
+                }
+                else if (element.LocalName == "oMath")
+                {
+                    sb.Append(MathParser.ParseOfficeMath(element));
+                }
             }
             else if (element is OpenXmlCompositeElement composite)
             {
@@ -155,6 +168,10 @@ internal static class DocumentParser
             {
                 ParseHyperlink(hyperlink, mainPart, settings, sb);
             }
+            else if (child.NamespaceUri == MathNamespace && child.LocalName == "oMath")
+            {
+                sb.Append(MathParser.ParseOfficeMath(child));
+            }
             else if (child is OpenXmlCompositeElement composite)
             {
                 ParseInlineElement(composite, mainPart, settings, sb);
@@ -201,7 +218,7 @@ internal static class DocumentParser
                     {
                         if (mainPart.GetPartById(blip.Embed.Value) is ImagePart imagePart)
                         {
-                            sb.Append(ImageExtractor.ExtractImage(imagePart, settings, "doc_img"));
+                            sb.Append(ImageExtractor.ExtractImage(imagePart, settings, "Image"));
                         }
                     }
                 }

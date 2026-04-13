@@ -1,14 +1,10 @@
-// Copyright (c) Microsoft. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
-
-using DocumentFormat.OpenXml.Packaging;
-using DocumentFormat.OpenXml.Spreadsheet;
-
 using System;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Spreadsheet;
 
 namespace DocumentFormat.OpenXml.Markdown;
 
@@ -17,7 +13,7 @@ namespace DocumentFormat.OpenXml.Markdown;
 /// </summary>
 internal static class SpreadsheetParser
 {
-    [SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "Respect interface")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "<Pending>")]
     public static string Parse(SpreadsheetDocument document, MarkdownConverterSettings settings)
     {
         var sb = new StringBuilder();
@@ -54,13 +50,11 @@ internal static class SpreadsheetParser
                 if (rows.Count > 0)
                 {
                     var maxCol = 0;
-
                     foreach (var row in rows)
                     {
                         foreach (var cell in row.Elements<Cell>())
                         {
                             var colIndex = GetColumnIndex(cell.CellReference?.Value);
-
                             if (colIndex > maxCol)
                             {
                                 maxCol = colIndex;
@@ -69,29 +63,30 @@ internal static class SpreadsheetParser
                     }
 
                     var isFirstRow = true;
-
                     foreach (var row in rows)
                     {
                         var cells = row.Elements<Cell>().ToDictionary(c => GetColumnIndex(c.CellReference?.Value));
 
                         sb.Append('|');
+
                         for (var i = 1; i <= maxCol; i++)
                         {
                             var cellValue = cells.TryGetValue(i, out var cell) ? GetCellValue(cell, stringTable) : string.Empty;
-
                             cellValue = cellValue.Replace("|", "\\|", StringComparison.Ordinal);
-
-                            sb.AppendFormat(CultureInfo.InvariantCulture, " {0} |", cellValue);
+                            sb.Append(' ').Append(cellValue).Append(" |");
                         }
+
                         sb.AppendLine();
 
                         if (isFirstRow)
                         {
                             sb.Append('|');
+
                             for (var i = 1; i <= maxCol; i++)
                             {
                                 sb.Append(" --- |");
                             }
+
                             sb.AppendLine();
                             isFirstRow = false;
                         }
@@ -121,6 +116,7 @@ internal static class SpreadsheetParser
             columnIndex += (columnReference[i] - 'A' + 1) * factor;
             factor *= 26;
         }
+
         return columnIndex;
     }
 
@@ -146,8 +142,6 @@ internal static class SpreadsheetParser
         }
         else if (cell.CellFormula is not null)
         {
-            // If the cell contains a formula, the CellValue typically contains the cached computed value
-            // We return that directly.
             return value;
         }
 

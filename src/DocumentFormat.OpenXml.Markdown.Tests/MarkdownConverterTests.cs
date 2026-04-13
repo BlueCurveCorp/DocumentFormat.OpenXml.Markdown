@@ -5,11 +5,14 @@ using System.Threading.Tasks;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Presentation;
 using DocumentFormat.OpenXml.Spreadsheet;
+using DocumentFormat.OpenXml.Wordprocessing;
 
 namespace DocumentFormat.OpenXml.Markdown.Tests;
 
 public class MarkdownConverterTests
 {
+    private const string MathNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/math";
+
     [Test]
     public async Task WordDocument_SimpleParagraphs_ConvertedCorrectly()
     {
@@ -38,6 +41,69 @@ public class MarkdownConverterTests
         // Assert
         await Assert.That(markdown).Contains("Hello World!");
         await Assert.That(markdown).Contains("# Heading 1");
+    }
+
+    [Test]
+    public async Task WordDocument_Equation_ConvertedCorrectly()
+    {
+        using var stream = new MemoryStream();
+        using (var document = WordprocessingDocument.Create(stream, WordprocessingDocumentType.Document))
+        {
+            var mainPart = document.AddMainDocumentPart();
+            mainPart.Document = new Document(new Body());
+
+            var officeMath = new DocumentFormat.OpenXml.Math.OfficeMath();
+            officeMath.AppendChild(new DocumentFormat.OpenXml.Math.Run(new DocumentFormat.OpenXml.Math.Text("x")));
+            officeMath.AppendChild(new DocumentFormat.OpenXml.Math.Run(new DocumentFormat.OpenXml.Math.Text("^")));
+            officeMath.AppendChild(new DocumentFormat.OpenXml.Math.Run(new DocumentFormat.OpenXml.Math.Text("2")));
+
+            var mathPara = new DocumentFormat.OpenXml.Math.Paragraph(officeMath);
+            mainPart.Document.Body!.Append(mathPara);
+        }
+
+        stream.Position = 0;
+        using var readDoc = WordprocessingDocument.Open(stream, false);
+
+        var markdown = await MarkdownConverter.ConvertToMarkdownAsync(readDoc);
+
+        await Assert.That(markdown).Contains("$x^2$");
+    }
+
+    [Test]
+    public async Task WordDocument_Equation_Strict()
+    {
+        // Arrange
+        using var stream = File.OpenRead(@"data\strict\equation.docx");
+
+        stream.Position = 0;
+        using var readDoc = WordprocessingDocument.Open(stream, false);
+
+        // Act
+        var markdown = await MarkdownConverter.ConvertToMarkdownAsync(readDoc);
+
+        // Assert
+        await Assert.That(markdown).Contains(@"$\sin {\alpha }\pm \sin {\beta }=2\sin {\frac{1}{2}\left( \alpha \pm \beta  \right)}\cos {\frac{1}{2}\left( \alpha \mp \beta  \right)}$");
+        await Assert.That(markdown).Contains(@"$\lim_{n\rightarrow \infty} {\left( 1+\frac{1}{n} \right)}^{n}$");
+        await Assert.That(markdown).Contains(@"${e}^{x}=1+\frac{x}{1!}+\frac{{x}^{2}}{2!}+\frac{{x}^{3}}{3!}+\dots ,  -\infty <x<\infty$");
+    }
+
+
+    [Test]
+    public async Task WordDocument_Equation_Transitional()
+    {
+        // Arrange
+        using var stream = File.OpenRead(@"data\transitional\equation.docx");
+
+        stream.Position = 0;
+        using var readDoc = WordprocessingDocument.Open(stream, false);
+
+        // Act
+        var markdown = await MarkdownConverter.ConvertToMarkdownAsync(readDoc);
+
+        // Assert
+        await Assert.That(markdown).Contains(@"$\sin {\alpha }\pm \sin {\beta }=2\sin {\frac{1}{2}\left( \alpha \pm \beta  \right)}\cos {\frac{1}{2}\left( \alpha \mp \beta  \right)}$");
+        await Assert.That(markdown).Contains(@"$\lim_{n\rightarrow \infty} {\left( 1+\frac{1}{n} \right)}^{n}$");
+        await Assert.That(markdown).Contains(@"${e}^{x}=1+\frac{x}{1!}+\frac{{x}^{2}}{2!}+\frac{{x}^{3}}{3!}+\dots ,  -\infty <x<\infty$");
     }
 
     [Test]
@@ -621,8 +687,10 @@ public class MarkdownConverterTests
             var files = Directory.GetFiles(tempPath);
 
             // Assert
-            await Assert.That(markdown).Contains("![Image](https://cdn.example.com/assets/");
-
+            foreach (var file in files)
+            {
+                await Assert.That(markdown).Contains($"![Image](https://cdn.example.com/assets/{Path.GetFileName(file)})");
+            }
             await Assert.That(files).HasAtMost(1);
             await Assert.That(files[0]).EndsWith(".png");
         }
@@ -699,7 +767,15 @@ public class MarkdownConverterTests
             var markdown = await MarkdownConverter.ConvertToMarkdownAsync(readDoc, settings);
             var files = Directory.GetFiles(tempPath);
             // Assert
-            await Assert.That(markdown).Contains("![Image](./");            
+
+            foreach (var file in files)
+            {
+                var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(file);
+                var name = fileNameWithoutExtension[..fileNameWithoutExtension.LastIndexOf('_')];
+
+                await Assert.That(markdown).Contains($"![{name}](./{Path.GetFileName(file)})");
+            }
+
             await Assert.That(files).HasAtMost(1);
             await Assert.That(files[0]).EndsWith(".png");
         }
@@ -710,5 +786,197 @@ public class MarkdownConverterTests
                 Directory.Delete(tempPath, true);
             }
         }
+    }
+
+    [Test]
+    public async Task PowerPoint_Equation_ConvertedCorrectly()
+    {
+        using var stream = new MemoryStream();
+        using (var document = PresentationDocument.Create(stream, PresentationDocumentType.Presentation))
+        {
+            var presentationPart = document.AddPresentationPart();
+            presentationPart.Presentation = new DocumentFormat.OpenXml.Presentation.Presentation(new DocumentFormat.OpenXml.Presentation.SlideIdList(new DocumentFormat.OpenXml.Presentation.SlideId() { Id = 256, RelationshipId = "rId1" }));
+
+            var slidePart = presentationPart.AddNewPart<SlidePart>("rId1");
+
+            var math = new DocumentFormat.OpenXml.Math.OfficeMath();
+            math.AppendChild(new DocumentFormat.OpenXml.Math.Run(new DocumentFormat.OpenXml.Math.Text("y")));
+            math.AppendChild(new DocumentFormat.OpenXml.Math.Run(new DocumentFormat.OpenXml.Math.Text("=")));
+            math.AppendChild(new DocumentFormat.OpenXml.Math.Run(new DocumentFormat.OpenXml.Math.Text("x")));
+
+            slidePart.Slide = new DocumentFormat.OpenXml.Presentation.Slide(
+                new DocumentFormat.OpenXml.Presentation.CommonSlideData(
+                    new DocumentFormat.OpenXml.Presentation.ShapeTree(
+                        new DocumentFormat.OpenXml.Presentation.Shape(
+                            new DocumentFormat.OpenXml.Presentation.TextBody(
+                                new DocumentFormat.OpenXml.Drawing.Paragraph(math))))));
+        }
+
+        stream.Position = 0;
+        using var readDoc = PresentationDocument.Open(stream, false);
+
+        var markdown = await MarkdownConverter.ConvertToMarkdownAsync(readDoc);
+
+        await Assert.That(markdown).Contains("$y=x$");
+    }
+
+
+    [Test]
+    public async Task PowerPoint_Equation_Strict()
+    {
+        // Arrange
+        using var stream = File.OpenRead(@"data\strict\equation.pptx");
+        stream.Position = 0;
+        using var readDoc = PresentationDocument.Open(stream, false);
+
+        // Act
+        var markdown = await MarkdownConverter.ConvertToMarkdownAsync(readDoc);
+ 
+        await Assert.That(markdown).Contains("$y=x$");
+    }
+
+    [Test]
+    public async Task WordDocument_ExponentialSeries_ConvertedCorrectly()
+    {
+        using var stream = new MemoryStream();
+        using (var document = WordprocessingDocument.Create(stream, WordprocessingDocumentType.Document))
+        {
+            var mainPart = document.AddMainDocumentPart();
+            mainPart.Document = new Document(new Body());
+
+            // Create: e^x = 1 + x/1! + ... , -inf < x < inf
+            var officeMath = CreateMathElement("oMath");
+
+            // e^x
+            var sSup = CreateMathElement("sSup");
+            var eBase = CreateMathElement("e");
+            eBase.AppendChild(CreateMathRun("e"));
+            var supVal = CreateMathElement("sup");
+            supVal.AppendChild(CreateMathRun("x"));
+            sSup.AppendChild(eBase);
+            sSup.AppendChild(supVal);
+            officeMath.AppendChild(sSup);
+
+            officeMath.AppendChild(CreateMathRun("="));
+            officeMath.AppendChild(CreateMathRun("1"));
+            officeMath.AppendChild(CreateMathRun("+"));
+
+            // x/1!
+            var f = CreateMathElement("f");
+            var num = CreateMathElement("num");
+            num.AppendChild(CreateMathRun("x"));
+            var den = CreateMathElement("den");
+            den.AppendChild(CreateMathRun("1!"));
+            f.AppendChild(num);
+            f.AppendChild(den);
+            officeMath.AppendChild(f);
+
+            officeMath.AppendChild(CreateMathRun("+"));
+            officeMath.AppendChild(CreateMathRun("\u2026")); // dots
+            officeMath.AppendChild(CreateMathRun(","));
+            officeMath.AppendChild(CreateMathRun("-"));
+            officeMath.AppendChild(CreateMathRun("\u221E")); // inf
+            officeMath.AppendChild(CreateMathRun("<"));
+            officeMath.AppendChild(CreateMathRun("x"));
+            officeMath.AppendChild(CreateMathRun("<"));
+            officeMath.AppendChild(CreateMathRun("\u221E")); // inf
+
+            var mathPara = CreateMathElement("oMathPara");
+            mathPara.AppendChild(officeMath);
+            mainPart.Document.Body!.Append(mathPara);
+        }
+
+        stream.Position = 0;
+        using var readDoc = WordprocessingDocument.Open(stream, false);
+        var markdown = await MarkdownConverter.ConvertToMarkdownAsync(readDoc);
+
+        await Assert.That(markdown).Contains(@"e^{x}");
+        await Assert.That(markdown).Contains(@"\frac{x}{1!}");
+        await Assert.That(markdown).Contains(@"\dots");
+        await Assert.That(markdown).Contains(@"\infty");
+    }
+
+
+    [Test]
+    public async Task WordDocument_LimitEquation_ConvertedCorrectly()
+    {
+        using var stream = new MemoryStream();
+        using (var document = WordprocessingDocument.Create(stream, WordprocessingDocumentType.Document))
+        {
+            var mainPart = document.AddMainDocumentPart();
+            mainPart.Document = new Document(new Body());
+
+            // Create: lim_{n->inf} (1 + 1/n)^n
+            var officeMath = new DocumentFormat.OpenXml.Math.OfficeMath();
+
+            // limLow (e="lim", lim="n->inf")
+            var limLow = CreateMathElement("limLow");
+            var e = CreateMathElement("e");
+            e.AppendChild(CreateMathRun("lim"));
+            var lim = CreateMathElement("lim");
+            lim.AppendChild(CreateMathRun("n\u2192\u221E")); // n->inf
+
+            limLow.AppendChild(e);
+            limLow.AppendChild(lim);
+
+            // Sup (e="(1 + 1/n)", sup="n")
+            var sup = CreateMathElement("sSup");
+            var e2 = CreateMathElement("e");
+            e2.AppendChild(CreateMathRun("("));
+            e2.AppendChild(CreateMathRun("1"));
+            e2.AppendChild(CreateMathRun("+"));
+            var f = CreateMathElement("f");
+            var num = CreateMathElement("num");
+            num.AppendChild(CreateMathRun("1"));
+            var den = CreateMathElement("den");
+            den.AppendChild(CreateMathRun("n"));
+            f.AppendChild(num);
+            f.AppendChild(den);
+            e2.AppendChild(f);
+            e2.AppendChild(CreateMathRun(")"));
+
+            var super = CreateMathElement("sup");
+            super.AppendChild(CreateMathRun("n"));
+
+            sup.AppendChild(e2);
+            sup.AppendChild(super);
+
+            officeMath.AppendChild(limLow);
+            officeMath.AppendChild(sup);
+
+            var mathPara = new DocumentFormat.OpenXml.Math.Paragraph(officeMath);
+            mainPart.Document.Body!.Append(mathPara);
+        }
+
+        stream.Position = 0;
+        using var readDoc = WordprocessingDocument.Open(stream, false);
+        var markdown = await MarkdownConverter.ConvertToMarkdownAsync(readDoc);
+
+        // Actual output was: $\lim_{n\rightarrow \infty}{(1+\frac{1}{n})}^{n}$
+        await Assert.That(markdown).Contains(@"\lim_{n\rightarrow \infty}");
+        await Assert.That(markdown).Contains(@"\frac{1}{n}");
+        await Assert.That(markdown).Contains(@"^{n}");
+
+    }
+
+    private static OpenXmlElement CreateMathElement(string tagName)
+    {
+        return new OpenXmlUnknownElement("m", tagName, MathNamespace);
+    }
+
+    private static OpenXmlElement CreateMathElementWithVal(string tagName, string val)
+    {
+        var element = CreateMathElement(tagName);
+        element.SetAttribute(new OpenXmlAttribute(string.Empty, "val", string.Empty, val));
+        return element;
+    }
+
+    private static OpenXmlElement CreateMathRun(string text)
+    {
+        var r = CreateMathElement("r");
+        var t = CreateMathElement("t");
+        t.AppendChild(new DocumentFormat.OpenXml.Math.Text(text));
+        r.AppendChild(t);
+        return r;
     }
 }

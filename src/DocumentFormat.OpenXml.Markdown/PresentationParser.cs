@@ -1,10 +1,12 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Presentation;
-using DocumentFormat.OpenXml.Drawing;
+
+using D = DocumentFormat.OpenXml.Drawing;
 
 namespace DocumentFormat.OpenXml.Markdown;
 
@@ -13,34 +15,37 @@ namespace DocumentFormat.OpenXml.Markdown;
 /// </summary>
 internal static class PresentationParser
 {
+    private const string MathNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/math";
+
     public static string Parse(PresentationDocument document, MarkdownConverterSettings settings)
     {
         var sb = new StringBuilder();
         var presentationPart = document.PresentationPart;
 
-        if (presentationPart?.Presentation?.SlideIdList is null)
+        if (presentationPart is null)
+        {
+            return string.Empty;
+        }
+
+        var slideIds = presentationPart.Presentation?.SlideIdList?.Elements<SlideId>();
+
+        if (slideIds is null)
         {
             return string.Empty;
         }
 
         var slideIndex = 1;
-
-        foreach (var slideId in presentationPart.Presentation.SlideIdList.Elements<SlideId>())
+        foreach (var slideId in slideIds)
         {
             if (slideId.RelationshipId is null)
             {
                 continue;
             }
 
-            var slidePart = presentationPart.GetPartById(slideId.RelationshipId.Value!) as SlidePart;
-            if (slidePart?.Slide is null)
-            {
-                continue;
-            }
+            var slidePart = (SlidePart)presentationPart.GetPartById(slideId.RelationshipId!);
+            var slideTitle = string.Empty;
 
-            // Try to find the slide title
-            string? slideTitle = null;
-            var titleShape = slidePart.Slide.Descendants<DocumentFormat.OpenXml.Presentation.Shape>()
+            var titleShape = slidePart.Slide?.Descendants<Shape>()
                 .FirstOrDefault(s => s.NonVisualShapeProperties?.ApplicationNonVisualDrawingProperties?.PlaceholderShape?.Type?.Value == PlaceholderValues.Title ||
                                     s.NonVisualShapeProperties?.ApplicationNonVisualDrawingProperties?.PlaceholderShape?.Type?.Value == PlaceholderValues.CenteredTitle);
 
@@ -49,54 +54,39 @@ internal static class PresentationParser
                 slideTitle = titleShape.TextBody.InnerText;
             }
 
-            sb.AppendLine($"## {(string.IsNullOrEmpty(slideTitle) ? $"Slide {slideIndex}" : slideTitle)}");
+            sb.AppendFormat(CultureInfo.InvariantCulture, "## {0}", string.IsNullOrEmpty(slideTitle) ? "Slide " + slideIndex : slideTitle).AppendLine();
             sb.AppendLine();
 
-            var shapes = slidePart.Slide.Descendants<DocumentFormat.OpenXml.Presentation.Shape>();
+            var shapes = slidePart!.Slide!.Descendants<Shape>();
 
             foreach (var shape in shapes)
             {
-                // Skip title shape as we already used it
-                if (shape == titleShape)
+                if (shape.TextBody is not null)
                 {
-                    continue;
-                }
-
-                var textBody = shape.TextBody;
-                if (textBody is not null)
-                {
-                    foreach (var paragraph in textBody.Elements<DocumentFormat.OpenXml.Drawing.Paragraph>())
+                    foreach (var paragraph in shape.TextBody.Elements<D.Paragraph>())
                     {
-                        ParseDrawingParagraph(paragraph, sb);
+                        ParseDrawingParagraph(paragraph, slidePart, settings, sb);
                     }
                 }
             }
 
-            // Extract tables from GraphicFrames
-            var graphicFrames = slidePart.Slide.Descendants<DocumentFormat.OpenXml.Presentation.GraphicFrame>();
-            foreach (var frame in graphicFrames)
+            var tables = slidePart.Slide.Descendants<D.Table>();
+            foreach (var table in tables)
             {
-                var table = frame.Descendants<DocumentFormat.OpenXml.Drawing.Table>().FirstOrDefault();
-                if (table is not null)
-                {
-                    ParseDrawingTable(table, sb);
-                }
+                ParseDrawingTable(table, sb);
             }
 
-
-            // Extract any pics if needed
-            var pics = slidePart.Slide.Descendants<DocumentFormat.OpenXml.Presentation.Picture>().ToList();
+            var pics = slidePart.Slide.Descendants<Picture>().ToList();
             if (pics.Count > 0 && settings.ImageExportMode != ImageExportMode.Ignore)
             {
-                sb.AppendLine();
                 foreach (var pic in pics)
                 {
                     var blip = pic.BlipFill?.Blip;
-                    if (blip?.Embed?.Value is not null)
+                    if (blip?.Embed is not null)
                     {
-                        if (slidePart.GetPartById(blip.Embed.Value) is ImagePart imagePart)
+                        if (slidePart.TryGetPartById(blip.Embed!, out var part) && part is ImagePart imagePart)
                         {
-                            sb.AppendLine(ImageExtractor.ExtractImage(imagePart, settings, $"slide{slideIndex}_img"));
+                            sb.AppendLine(ImageExtractor.ExtractImage(imagePart, settings, "ppt_slide_" + slideIndex));
                             sb.AppendLine();
                         }
                     }
@@ -110,100 +100,163 @@ internal static class PresentationParser
         return sb.ToString().TrimEnd();
     }
 
-    private static void ParseDrawingParagraph(DocumentFormat.OpenXml.Drawing.Paragraph paragraph, StringBuilder sb)
+#pragma warning disable IDE0060 // Remove unused parameter
+    private static void ParseDrawingParagraph(D.Paragraph paragraph, SlidePart slidePart, MarkdownConverterSettings settings, StringBuilder sb)
+#pragma warning restore IDE0060 // Remove unused parameter
     {
-        var isBullet = paragraph.ParagraphProperties?.GetFirstChild<BulletFont>() is not null ||
-                       paragraph.ParagraphProperties?.GetFirstChild<CharacterBullet>() is not null;
+        var pPr = paragraph.ParagraphProperties;
+        var level = pPr?.Level?.Value ?? 0;
 
-        if (isBullet)
+        var isBullet = false;
+
+        if (pPr is not null)
         {
-            var level = paragraph.ParagraphProperties?.Level?.Value ?? 0;
-            for (var i = 0; i < level; i++)
+            foreach (var child in pPr.ChildElements)
             {
-                sb.Append("  ");
-            }
-
-            sb.Append("- ");
-        }
-
-        foreach (var run in paragraph.Elements<DocumentFormat.OpenXml.Drawing.Run>())
-        {
-            var isBold = run.RunProperties?.Bold?.Value ?? false;
-            var isItalic = run.RunProperties?.Italic?.Value ?? false;
-
-            if (isBold)
-            {
-                sb.Append("**");
-            }
-
-            if (isItalic)
-            {
-                sb.Append('*');
-            }
-
-            sb.Append(run.Text?.Text);
-
-            if (isItalic)
-            {
-                sb.Append('*');
-            }
-
-            if (isBold)
-            {
-                sb.Append("**");
+                if (child.LocalName.StartsWith("bu", StringComparison.Ordinal) && child.LocalName != "buNone")
+                {
+                    isBullet = true;
+                    break;
+                }
             }
         }
 
-        sb.AppendLine();
+        if (level > 0 || isBullet)
+        {
+            sb.Append(new string(' ', level * 2)).Append("- ");
+        }
+
+        foreach (var child in paragraph.ChildElements)
+        {
+            if (child is D.Run run)
+            {
+                var isBold = run.RunProperties?.Bold?.Value ?? false;
+                var isItalic = run.RunProperties?.Italic?.Value ?? false;
+
+                if (isBold)
+                {
+                    sb.Append("**");
+                }
+
+                if (isItalic)
+                {
+                    sb.Append('*');
+                }
+
+                sb.Append(run.Text?.Text);
+
+                if (isItalic)
+                {
+                    sb.Append('*');
+                }
+
+                if (isBold)
+                {
+                    sb.Append("**");
+                }
+            }
+            else if (child.NamespaceUri == MathNamespace && child.LocalName == "oMath")
+            {
+                sb.Append(MathParser.ParseOfficeMath(child));
+            }
+        }
+
         sb.AppendLine();
     }
 
-    private static void ParseDrawingTable(DocumentFormat.OpenXml.Drawing.Table table, StringBuilder sb)
+    private static void ParseDrawingTable(D.Table table, StringBuilder sb)
     {
-        var rows = table.Elements<DocumentFormat.OpenXml.Drawing.TableRow>().ToList();
+        var rows = table.Elements<D.TableRow>().ToList();
         if (rows.Count == 0)
         {
             return;
         }
 
-        // Header
         var firstRow = rows[0];
         sb.Append('|');
-        foreach (var cell in firstRow.Elements<DocumentFormat.OpenXml.Drawing.TableCell>())
+        foreach (var cell in firstRow.Elements<D.TableCell>())
         {
-            var text = cell.TextBody?.InnerText.Trim() ?? string.Empty;
-            sb.Append(' ');
-            sb.Append(text.Replace("|", "\\|", StringComparison.Ordinal));
-            sb.Append(" |");
+            var cellContent = new StringBuilder();
+            if (cell.TextBody is not null)
+            {
+                foreach (var p in cell.TextBody.Elements<D.Paragraph>())
+                {
+                    var pContent = new StringBuilder();
+                    foreach (var child in p.ChildElements)
+                    {
+                        if (child is D.Run run)
+                        {
+                            pContent.Append(run.Text?.Text);
+                        }
+                        else if (child.NamespaceUri == MathNamespace && child.LocalName == "oMath")
+                        {
+                            pContent.Append(MathParser.ParseOfficeMath(child));
+                        }
+                    }
+
+                    if (cellContent.Length > 0 && pContent.Length > 0)
+                    {
+                        cellContent.Append("<br>");
+                    }
+
+                    cellContent.Append(pContent);
+                }
+            }
+
+            var text = cellContent.ToString().Trim();
+            sb.Append(' ').Append(text.Replace("|", "\\|", StringComparison.Ordinal)).Append(" |");
         }
 
         sb.AppendLine();
 
-        // Separator
         sb.Append('|');
 
-        foreach (var _ in firstRow.Elements<DocumentFormat.OpenXml.Drawing.TableCell>())
+        foreach (var unused in firstRow.Elements<D.TableCell>())
         {
             sb.Append(" --- |");
         }
 
         sb.AppendLine();
 
-        // Data rows
         for (var i = 1; i < rows.Count; i++)
         {
             sb.Append('|');
-
-            foreach (var cell in rows[i].Elements<DocumentFormat.OpenXml.Drawing.TableCell>())
+            foreach (var cell in rows[i].Elements<D.TableCell>())
             {
-                var text = cell.TextBody?.InnerText.Trim() ?? string.Empty;
-                sb.Append(' ');
-                sb.Append(text.Replace("|", "\\|", StringComparison.Ordinal));
-                sb.Append(" |");
+                var cellContent = new StringBuilder();
+                if (cell.TextBody is not null)
+                {
+                    foreach (var p in cell.TextBody.Elements<D.Paragraph>())
+                    {
+                        var pContent = new StringBuilder();
+                        foreach (var child in p.ChildElements)
+                        {
+                            if (child is D.Run run)
+                            {
+                                pContent.Append(run.Text?.Text);
+                            }
+                            else if (child.NamespaceUri == MathNamespace && child.LocalName == "oMath")
+                            {
+                                pContent.Append(MathParser.ParseOfficeMath(child));
+                            }
+                        }
+
+                        if (cellContent.Length > 0 && pContent.Length > 0)
+                        {
+                            cellContent.Append("<br>");
+                        }
+
+                        cellContent.Append(pContent);
+                    }
+                }
+
+                var text = cellContent.ToString().Trim();
+                sb.Append(' ').Append(text.Replace("|", "\\|", StringComparison.Ordinal)).Append(" |");
             }
 
             sb.AppendLine();
         }
+
         sb.AppendLine();
     }
 }

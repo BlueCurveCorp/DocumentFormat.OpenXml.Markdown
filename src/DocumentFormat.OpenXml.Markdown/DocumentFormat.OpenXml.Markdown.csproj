@@ -4,14 +4,14 @@
         <TargetFramework>net10.0</TargetFramework>
         <Summary>Provides Markdown conversion capabilities for the Open XML SDK.</Summary>
         <Description>Provides standard and GitHub Flavored Markdown conversion functionality for word processing, spreadsheet, and presentation Open XML documents.</Description>
-        <!--<EnablePackageValidation>false</EnablePackageValidation>-->
-        <!--<IncludeFrameworkShims>true</IncludeFrameworkShims>-->
         <Nullable>enable</Nullable>
         <IsPackable>true</IsPackable>
         <PackageTags>Open XML SDK;Markdown;GitHub Flavored Markdown;GFM;Document Conversion</PackageTags>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageId>DocumentFormat.OpenXml.Markdown</PackageId>
         <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageVersion>1.0.1</PackageVersion>
+        <EnableSourceLink>true</EnableSourceLink>
     </PropertyGroup>
 
     <ItemGroup>

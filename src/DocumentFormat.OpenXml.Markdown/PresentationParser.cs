@@ -45,7 +45,7 @@ internal static class PresentationParser
             var slidePart = (SlidePart)presentationPart.GetPartById(slideId.RelationshipId!);
             var slideTitle = string.Empty;
 
-            var titleShape = slidePart.Slide?.Descendants<Shape>()
+            var titleShape = slidePart?.Slide?.Descendants<Shape>()
                 .FirstOrDefault(s => s.NonVisualShapeProperties?.ApplicationNonVisualDrawingProperties?.PlaceholderShape?.Type?.Value == PlaceholderValues.Title ||
                                     s.NonVisualShapeProperties?.ApplicationNonVisualDrawingProperties?.PlaceholderShape?.Type?.Value == PlaceholderValues.CenteredTitle);
 
@@ -159,6 +159,10 @@ internal static class PresentationParser
             {
                 sb.Append(MathParser.ParseOfficeMath(child));
             }
+            else if (child.NamespaceUri == MathNamespace && child.LocalName == "oMathPara")
+            {
+                sb.Append(MathParser.ParseOfficeMathPara(child));
+            }
         }
 
         sb.AppendLine();
@@ -167,13 +171,16 @@ internal static class PresentationParser
     private static void ParseDrawingTable(D.Table table, StringBuilder sb)
     {
         var rows = table.Elements<D.TableRow>().ToList();
+
         if (rows.Count == 0)
         {
             return;
         }
 
         var firstRow = rows[0];
+
         sb.Append('|');
+
         foreach (var cell in firstRow.Elements<D.TableCell>())
         {
             var cellContent = new StringBuilder();
@@ -204,13 +211,13 @@ internal static class PresentationParser
             }
 
             var text = cellContent.ToString().Trim();
+
             sb.Append(' ').Append(text.Replace("|", "\\|", StringComparison.Ordinal)).Append(" |");
         }
 
         sb.AppendLine();
 
         sb.Append('|');
-
         foreach (var unused in firstRow.Elements<D.TableCell>())
         {
             sb.Append(" --- |");

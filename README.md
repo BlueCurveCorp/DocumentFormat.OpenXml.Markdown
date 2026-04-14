@@ -85,6 +85,44 @@ string markdown = MarkdownConverter.ConvertToMarkdown(wordDoc, settings);
 - **Tables**: Small, simple tables work best. For Word and PowerPoint tables containing lists or multiple paragraphs in a single cell, the library uses `<br>` tags to preserve visual structure within GFM-compliant rows.
 - **Lists**: Multi-level bullets are supported for both Word and PowerPoint, utilizing standard Markdown indentation logic.
 
+## Office Math to LaTeX Supported Expressions
+
+The `DocumentFormat.OpenXml.Markdown` parser comes with exhaustive support for Office Math (OMML) conversion to high-fidelity LaTeX within Markdown output.
+
+It recursively searches through Word (`.docx`) nested structures (including tables) and PowerPoint (`.pptx`) DrawingML containers to identify and seamlessly extract mathematical structures.
+
+## Supported OMML Mathematical Expressions
+
+### 1. Basic Structures
+
+- **Fractions (`f`)**: Automatically translated to `\frac{numerator}{denominator}` or `\binom{n}{k}` depending on the fractional bar presence.
+- **Radicals (`rad`)**: N-th roots translated accurately (e.g. `\sqrt[n]{x}` vs square root `\sqrt{x}`).
+- **Scripts & Indices**: Subscripts (`sSub`), Superscripts (`sSup`), Sub-Superscripts (`sSubSup`), and Left Sub-Superscripts/Pre-scripts (`sPre`) (e.g., `_{n}^{m}Y`).
+
+### 2. Groupings & Delimiters
+* **Delimiters (`d`)**: Automatically detects and translates bracket mappings (parentheses, braces `\{`, brackets `[`, absolute values `|`, norms `\|`, and floor/ceiling). Dynamically scales using `\left` and `\right`.
+- **Delimiters (`d`)**: Automatically detects and translates bracket mappings (parentheses, braces `\{`, brackets `[`, absolute values `|`, norms `\|`, and floor/ceiling). Dynamically scales using `\left` and `\right`. 
+- **Piecewise Functions (`cases`)**: Seamlessly identifies piecewise equations inside single-sided bracket structures `{` and maps them correctly to `\begin{cases} ... \end{cases}`.
+
+### 3. Advanced Structures
+
+- **Large Operators (`nary`)**: Supports Integrals (`\int`), Double/Triple Integrals, Summations (`\sum`), Products (`\prod`), and Contour Integrals, along with their respective lower bounds and upper limits.
+- **Limiting Functions (`limLow`, `limUpp`)**: Detects layout instructions for generic functions (like `\lim`, `\max`, `\sup`) and properly applies subscript bounds via `\lim_{x \to \infty}` formatting.
+- **Accents (`acc`)**: Replaces math accents correctly: `\hat`, `\vec`, `\tilde`, `\bar`, `\dot`, `\ddot`, `\breve`, etc.
+- **Arrays & Matrices (`eqArr`, `m`)**: Maps equation alignments (`eqArr`) into `\begin{aligned}` systems, and native multi-dimensional cell arrays (`m`) into `\begin{matrix}` structures.
+- **Group Characters (`groupChr`)**: Supports top-level and bottom-level layout formatting for grouping structures mapping to mathematical `\overset` or `\underset`.
+- **Boxes and Underlines (`box`, `borderBox`, `bar`)**: Properly encapsulates equations inside `\boxed{}` and applies overlines/underlines (`\overline`, `\underline`) across structures.
+
+### 4. Comprehensive Symbol Dictionary
+
+Includes an extensive multi-character mapping dictionary designed to preserve visual parity during translation:
+
+- All Uppercase and Lowercase Greek Symbols (`\alpha`, `\beta` ... `\Omega`)
+- Set representations (`\in`, `\subset`, `\cup`, `\cap`)
+- Propositional logic & arrows (`\forall`, `\exists`, `\rightarrow`, `\Leftrightarrow`)
+- Math operations and relations (`\pm`, `\times`, `\leq`, `\neq`, `\approx`, `\equiv`)
+- Function representations natively wrapped (e.g., trigonometric `\sin`, `\cos` and logarithmic `\ln`)
+
 ## Contributing
 
 We welcome contributions! To collaborate on this repository:
